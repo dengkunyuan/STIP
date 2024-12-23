@@ -235,8 +235,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    # 注意：当QPIC作为主模块时，请将导入包的代码改成import .datasets;当QPIC作为子模块时，请将导入包的代码改成import qpic.datasets
-    # 注意：QPIC作为子模块，需要在主模块中设置CUDA_VISIBLE_DEVICES，记得把下面两行代码注释掉
+    # 注意：当STIP作为主模块时，请将导入包的代码改成import .datasets;当STIP作为子模块时，请将导入包的代码改成import STIP.datasets
+    # 注意：STIP作为子模块，需要在主模块中设置CUDA_VISIBLE_DEVICES，记得把下面两行代码注释掉
     import os
     os.environ['CUDA_VISIBLE_DEVICES'] = "0,1,2,3"
 

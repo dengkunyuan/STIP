@@ -94,15 +94,20 @@ class STIP(nn.Module):
         outputs_coord = self.detr.bbox_embed(hs).sigmoid()
         # -----------------------------------------------
 
+        # 在训练模式下，将目标检测模型（DETR）的输出与目标（ground truth）进行匹配，并生成用于关系检测的目标关系对
         det2gt_indices = None
         if self.training:
             detr_outs = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
             det2gt_indices = self.detr_matcher(detr_outs, targets)
             gt_rel_pairs = []
+            # 遍历 det2gt_indices 和 targets，为每个目标生成一个映射 gt2det_map，将目标索引映射到检测索引，并生成关系对 gt_rels。
             for (ds, gs), t in zip(det2gt_indices, targets):
                 gt2det_map = torch.zeros(len(gs)).to(device=ds.device, dtype=ds.dtype)
                 gt2det_map[gs] = ds
+                # 根据hico.py可知，relation_map = torch.zeros((len(target['boxes']), len(target['boxes']), self.num_action()))
+                # t['relation_map'].sum(-1).nonzero(as_tuple=False)的作用是找到 relation_map 中所有非零元素的索引，即找到所有的关系gt_rels（一个二维张量）
                 gt_rels = gt2det_map[t['relation_map'].sum(-1).nonzero(as_tuple=False)]
+                # 随机打乱 gt_rels 的顺序
                 perm = torch.randperm(len(gt_rels))
 
                 gt_rel_pairs.append(gt_rels[perm])
@@ -111,9 +116,15 @@ class STIP(nn.Module):
                 #     # check_annotation(samples, targets, rel_num=20, idx=0)
 
         # >>>>>>>>>>>> HOI DETECTION LAYERS <<<<<<<<<<<<<<<
+        # 从特征图中提取关系特征，并根据配置选项从不同的层获取这些特征
+        # 初始化三个空列表，用于存储预测的关系存在性、关系对和动作。
         pred_rel_exists, pred_rel_pairs, pred_actions = [], [], []
+        # 将特征图的第0个元素分解为输入特征和掩码，features[0] 通常是从较浅层的特征图提取的，包含更多的空间信息和较少的语义信息。features[-1] 通常是从较深层的特征图提取的，包含更多的语义信息和较少的空间信息。
         memory_input, memory_input_mask = features[0].decompose()
+        # 获取第0个位置编码
         memory_pos = pos[0]
+        # 如果配置选项指定从 backbone 网络提取关系特征图，则将 features[0] 赋值给 relation_feature_map；
+        # 如果配置选项指定从 DETR 编码器提取关系特征图，则将 detr_encoder_outs 和 memory_input_mask 组合成一个 NestedTensor 赋值给 relation_feature_map，并将 detr_encoder_outs赋值给 memory_input。
         if self.args.relation_feature_map_from == 'backbone':
             relation_feature_map = features[0]
         elif self.args.relation_feature_map_from == 'detr_encoder':
@@ -125,17 +136,28 @@ class STIP(nn.Module):
 
         for imgid in range(bs):
             # >>>>>>>>>>>> relation proposal <<<<<<<<<<<<<<<
+            # 从outputs_class中提取实例分数和标签，并根据这些分数和标签确定人类实例和背景实例的ID。如果在非训练模式下并且设置了apply_nms_on_detr标志，则会应用非极大值抑制（NMS）来抑制某些实例ID。
+            # 使用softmax函数对outputs_class的最后一层进行归一化，得到概率分布probs
             probs = outputs_class[-1, imgid].softmax(-1)
+            # 从probs中提取实例分数inst_scores和实例标签inst_labels
             inst_scores, inst_labels = probs[:, :-1].max(-1)
+            # 通过逻辑与操作确定人类实例的ID（human_instance_ids），条件是实例分数大于0.5且实例标签为1（1代表person）。
             human_instance_ids = torch.logical_and(inst_scores>0.5, inst_labels==1).nonzero(as_tuple=False)
+            # 确定背景实例的ID（bg_instance_ids），条件是概率分布的最后一列（最后一列代表背景类别）大于1。
             bg_instance_ids = (probs[:, -1] > 1)
+            # 如果设置了 apply_nms_on_detr 标志并且不在训练模式下，调用 apply_nms 函数来抑制某些实例ID，并将这些ID标记为背景实例。
             if self.args.apply_nms_on_detr and not self.training:
                 suppress_ids = self.apply_nms(inst_scores, inst_labels, outputs_coord[-1, imgid])
                 bg_instance_ids[suppress_ids] = True
 
+            # 初始化一个关系矩阵 rel_mat，并根据一定的条件填充该矩阵，得到human-object pairs的关系矩阵
             rel_mat = torch.zeros((num_nodes, num_nodes))
+            # 将 human_instance_ids 对应的行和 ~bg_instance_ids 对应的列的元素设置为 1，表示这些关系对的主语是人类，宾语是非背景
             rel_mat[human_instance_ids, ~bg_instance_ids] = 1 # subj is human, obj is not background
+            # 如果数据集不是 vcoco，将对角线元素设置为 0，避免主语和宾语是同一个对象。
             if self.args.dataset_file != 'vcoco': rel_mat.fill_diagonal_(0)
+            # 如果启用了adaptive_relation_query_num，并且 rel_mat 中没有非零元素，则将 (0, 1) 位置的元素设置为 1。
+            # 如果没有启用adaptive_relation_query_num，并且 rel_mat 中的非零元素数量小于 self.args.num_hoi_queries，则随机选择一个 human_instance_ids 并将对应行的所有元素设置为 1。
             if self.args.adaptive_relation_query_num:
                 if len(rel_mat.nonzero(as_tuple=False)) == 0: rel_mat[0,1] = 1
             else: # ensure enough queries
@@ -144,50 +166,71 @@ class STIP(nn.Module):
                     rel_mat[tmp_id] = 1
 
             if self.training:
+                # 之前的关系矩阵 rel_mat 是根据目标检测模型的输出和目标生成的，现在需要根据这个关系矩阵生成负样本对，所以需要将 rel_mat 复制一份，以便在其上进行修改（这里直接在原 rel_mat 上修改）。
+                # 将 gt_rel_pairs[imgid][:,:1] 中的主语（即关系对中的第一个元素）与所有非背景实例（~bg_instance_ids）的关系设置为 1。这表示这些主语与所有非背景实例之间存在潜在的关系
                 rel_mat[gt_rel_pairs[imgid][:,:1], ~bg_instance_ids] = 1
+                #  将 gt_rel_pairs[imgid] 中的主语和宾语（即关系对中的第一个和第二个元素）之间的关系设置为 0。这表示这些主语和宾语之间不存在关系，避免将真实关系对作为负样本。
                 rel_mat[gt_rel_pairs[imgid][:,0], gt_rel_pairs[imgid][:, 1]] = 0
+                # 获取 rel_mat 中所有非零元素的索引，生成负样本对。这些索引表示潜在的负样本对，即主语和宾语之间没有真实关系的对。
                 rel_pairs = rel_mat.nonzero(as_tuple=False) # neg pairs
 
                 if self.args.use_hard_mining_for_relation_discovery:
                     # hard negative sampling
+                    # 将真实关系对 (gt_rel_pairs) 和负样本关系对 (rel_pairs) 合并成一个整体关系对 (all_pairs)
                     all_pairs = torch.cat([gt_rel_pairs[imgid], rel_pairs], dim=0)
                     gt_pair_count = len(gt_rel_pairs[imgid])
+                    # 使用 coarse_relation_feature_extractor 提取所有关系对的特征。
                     all_rel_reps = self.coarse_relation_feature_extractor(all_pairs, relation_feature_map, outputs_coord[-1, imgid].detach(), inst_repr[imgid], obj_label_logits=outputs_class[-1, imgid], idx=imgid)
+                    # 使用 relation_proposal_mlp 计算每个关系对的存在性得分
                     p_relation_exist_logits = self.relation_proposal_mlp(all_rel_reps)
 
+                    # 获取真实关系对的索引 (gt_inds)
                     gt_inds = torch.arange(gt_pair_count).to(p_relation_exist_logits.device)
+                    # 对负样本关系对的存在性得分进行排序 (sort_rel_inds)
                     _, sort_rel_inds = p_relation_exist_logits[gt_pair_count:].squeeze(1).sort(descending=True)
+                    # 将真实关系对和排序后的负样本关系对合并，并采样前 num_hoi_queries = 32 个关系对。
                     # _, sort_rel_inds = torch.cat([inst_scores[all_pairs[:, 1:]], p_relation_exist_logits.sigmoid()], dim=-1).prod(-1)[gt_pair_count:].sort(descending=True)
                     sampled_rel_inds = torch.cat([gt_inds, sort_rel_inds+gt_pair_count])[:self.args.num_hoi_queries]
 
+                    # 获取采样关系对的特征 (sampled_rel_reps) 和存在性得分interactiveness scores (sampled_rel_pred_exists)。
                     sampled_rel_pairs = all_pairs[sampled_rel_inds]
                     sampled_rel_reps = all_rel_reps[sampled_rel_inds]
                     sampled_rel_pred_exists = p_relation_exist_logits.squeeze(1)[sampled_rel_inds]
                 else:
                     # random sampling
+                    # 随机采样负样本对
                     sampled_neg_inds = torch.randperm(len(rel_pairs))
+                    # 合并正负样本对
                     sampled_rel_pairs = torch.cat([gt_rel_pairs[imgid], rel_pairs[sampled_neg_inds]], dim=0)[:self.args.num_hoi_queries]
+                    # 提取关系特征
                     sampled_rel_reps = self.coarse_relation_feature_extractor(sampled_rel_pairs, relation_feature_map, outputs_coord[-1, imgid].detach(), inst_repr[imgid], obj_label_logits=outputs_class[-1, imgid], idx=imgid)
+                    # 使用MLP计算关系存在性interactiveness score
                     sampled_rel_pred_exists = self.relation_proposal_mlp(sampled_rel_reps).squeeze(1)
             else:
+                # 在测试模式下，直接使用所有关系对进行关系检测
+                # 获取所有关系对的索引 (rel_pairs)，并提取这些关系对的特征 (rel_reps)，计算这些关系对的存在性得分 (p_relation_exist_logits)。
                 rel_pairs = rel_mat.nonzero(as_tuple=False)
                 rel_reps = self.coarse_relation_feature_extractor(rel_pairs, relation_feature_map, outputs_coord[-1, imgid].detach(), inst_repr[imgid], obj_label_logits=outputs_class[-1, imgid], idx=imgid)
                 p_relation_exist_logits = self.relation_proposal_mlp(rel_reps)
 
+                # 对关系存在性得分进行排序，得到排序后的索引 (sort_rel_inds)，并采样前 num_hoi_queries = 32 个关系对。
                 _, sort_rel_inds = p_relation_exist_logits.squeeze(1).sort(descending=True)
                 # _, sort_rel_inds = torch.cat([inst_scores[rel_pairs[:, 1:]], p_relation_exist_logits.sigmoid()], dim=-1).prod(-1).sort(descending=True)
                 sampled_rel_inds = sort_rel_inds[:self.args.num_hoi_queries]
 
+                # 根据选择的索引，获取采样关系对sampled_rel_pairs，采样关系对的特征sampled_rel_reps和存在性得分sampled_rel_pred_exists。
                 sampled_rel_pairs = rel_pairs[sampled_rel_inds]
                 sampled_rel_reps = rel_reps[sampled_rel_inds]
                 sampled_rel_pred_exists = p_relation_exist_logits.squeeze(1)[sampled_rel_inds]
 
             # >>>>>>>>>>>> relation classification <<<<<<<<<<<<<<<
+            # sampled_rel_reps的shape为(32, 1024)，query_reps的shape为(32, 1, 256)
             query_reps = self.rel_query_pre_proj(sampled_rel_reps).unsqueeze(1)
             if self.args.no_interaction_decoder:
                 outs = query_reps.unsqueeze(0)
             else:
                 query_pos_encoding, relation_dependency_encodings, layout_encodings, memory_union_mask, tgt_mask = None, None, None, None, None
+                # 生成关系对的布局掩码
                 subj_mask, obj_mask, union_mask, _ = self.generate_layout_masks(sampled_rel_pairs, memory_input_mask, outputs_coord[-1, imgid], idx=imgid)
                 if self.args.use_relation_tgt_mask:
                     tgt_mask = (torch.diag(sampled_rel_pred_exists) != 0)
@@ -197,6 +240,7 @@ class STIP(nn.Module):
                 if self.args.use_query_fourier_encoding:
                     query_coords = self.fourier_feature_embedding(outputs_coord[-1, imgid][sampled_rel_pairs].view(len(sampled_rel_pairs), 8, 1)) / np.sqrt(self.args.hidden_dim/2)
                     query_pos_encoding = self.fourier_mlp(torch.cat([torch.cos(query_coords), torch.sin(query_coords)], dim=-1)).view(len(sampled_rel_pairs), -1).unsqueeze(1)
+                # 生成关系对的语义结构编码
                 if self.args.use_relation_dependency_encoding:
                     dependency_map = torch.zeros((len(sampled_rel_pairs), len(sampled_rel_pairs))).to(sampled_rel_reps.device).long() # independent: 0
                     dependency_map[sampled_rel_pairs[:, 0].unsqueeze(1) == sampled_rel_pairs[:, 0].unsqueeze(0)] = 1 # same_subj: 1
@@ -210,6 +254,7 @@ class STIP(nn.Module):
                     ).unsqueeze(2) # (#query, #query, batch size, dim)
                 if self.args.use_memory_union_mask:
                     memory_union_mask = union_mask.flatten(1)
+                # 生成关系对的空间结构编码
                 if self.args.use_memory_layout_encoding:
                     layout_map = (~union_mask).long() + (~memory_input_mask[imgid:imgid+1]).long() + (~subj_mask).long() + (~obj_mask).long()*2
                     # plt.imshow(role_map[0].cpu().numpy(), cmap=plt.cm.hot_r); plt.colorbar(); plt.show()
@@ -440,23 +485,27 @@ class STIPCriterion(nn.Module):
         else:
             indices = outputs['det2gt_indices']
 
-        # generate relation targets
+        # generate relation targets，对应所有postivie和negative的关系对的targets
         all_rel_pair_targets = []
+        # 遍历每个图像的目标和匹配索引，为每个目标生成一个映射det2gt_map，将检测索引映射到目标索引，并生成关系映射gt_relation_map。
         for imgid, (tgt, (det_idxs, gtbox_idxs)) in enumerate(zip(targets, indices)):
             det2gt_map = {int(d): int(g) for d, g in zip(det_idxs, gtbox_idxs)}
             gt_relation_map = tgt['relation_map']
             rel_pairs = outputs['pred_rel_pairs'][imgid]
             rel_pair_targets = torch.zeros((len(rel_pairs), gt_relation_map.shape[-1])).to(gt_relation_map.device)
+            # 遍历每个预测的关系对 rel_pairs，如果关系对中的两个对象都在 det2gt_map 中，则将对应的关系目标赋值给 rel_pair_targets；否则，将关系目标设置为 全0向量
             for idx, rel in enumerate(rel_pairs):
                 if (int(rel[0]) in det2gt_map) and (int(rel[1]) in det2gt_map):
                     rel_pair_targets[idx] = gt_relation_map[det2gt_map[int(rel[0])], det2gt_map[int(rel[1])]]
             all_rel_pair_targets.append(rel_pair_targets)
+        # 将所有的关系目标拼接在一起得到形状为 (batch_size * 32, 117) 的张量，32 是关系对的数量，117 是verb类别数量
         all_rel_pair_targets = torch.cat(all_rel_pair_targets, dim=0)
 
         prior_verb_label_mask = None
         if self.args.dataset_file == 'hico-det':
             # no_interaction_id = self.args.action_names.index('no_interaction')
             # rel_proposal_targets = (all_rel_pair_targets[..., self.valid_ids].sum(-1) - all_rel_pair_targets[..., no_interaction_id] > 0).float()
+            # 计算 rel_proposal_targets，它是一个布尔张量，表示每个关系对是否有有效的动词标签，即是正关系对还是负关系对，也是论文 Eq.(1) 中提到的z_i
             rel_proposal_targets = (all_rel_pair_targets[..., self.valid_ids].sum(-1) > 0).float()
             if self.args.use_prior_verb_label_mask:
                 pred_obj_labels = outputs['pred_logits'][:,:,self.args.valid_obj_ids].argmax(-1)
@@ -573,6 +622,9 @@ class STIPPostProcess(nn.Module):
         boxes = boxes * scale_fct[:, None, :]
 
         # for relationship post-processing
+        # outputs['pred_rel_pairs']是一个包含预测关系对的列表，每个元素是一个形状为(N, 2)的张量，其中N是关系对的数量，2表示主语和宾语的索引。
+        # h_indices 通过列表推导式从每个关系对中提取第一个元素（主语索引）。
+        # o_indices 通过列表推导式从每个关系对中提取第二个元素（宾语索引）。
         h_indices = [p[:, 0] for p in outputs['pred_rel_pairs']]
         o_indices = [p[:, 1] for p in outputs['pred_rel_pairs']]
         if dataset == 'vcoco':
@@ -619,8 +671,11 @@ class STIPPostProcess(nn.Module):
         elif dataset == 'hico-det':
             # tail classification score
             _valid_obj_ids = self.args.valid_obj_ids + [self.args.valid_obj_ids[-1]+1]
+            # outputs['pred_logits'的形状是(batch size, 100, 92)，其中100是检测框的数量，92是物体类别数量。
+            # 从 outputs['pred_logits'] 中提取有效对象类别的logits。
             out_obj_logits = outputs['pred_logits'][..., _valid_obj_ids]
             obj_scores, obj_labels = [], []
+            # 遍历每个图像的对象索引和logits，得到对象的类别得分和类别标签。
             for o_ids, lgts in zip(o_indices, out_obj_logits):
                 img_obj_scores, img_obj_labels = F.softmax(lgts[o_ids], -1)[..., :-1].max(-1)
                 obj_scores.append(img_obj_scores)

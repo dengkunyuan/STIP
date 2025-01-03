@@ -12,9 +12,14 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.util.misc import (NestedTensor, nested_tensor_from_tensor_list)
+# STIP is running as the main module.
+# from src.util.misc import (NestedTensor, nested_tensor_from_tensor_list)
+# from .backbone import build_backbone
 
-from .backbone import build_backbone
+# STIP is running as a submodule.
+from STIP.src.util.misc import (NestedTensor, nested_tensor_from_tensor_list)
+from STIP.src.models.backbone import build_backbone
+
 from .detr_matcher import build_matcher
 from .hotr_matcher import build_hoi_matcher
 from .transformer import build_transformer, build_hoi_transformer

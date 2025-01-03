@@ -16,8 +16,13 @@ from torch.utils.data import Dataset
 from pycocotools.coco import COCO
 from pycocotools import mask as coco_mask
 
-from src.data.datasets import builtin_meta
-import src.data.transforms.transforms as T
+# STIP is running as the main module.
+# from src.data.datasets import builtin_meta
+# import src.data.transforms.transforms as T
+
+# STIP is running as a submodule.
+from STIP.src.data.datasets import builtin_meta
+import STIP.src.data.transforms.transforms as T
 
 class VCocoDetection(Dataset):
     def __init__(self,

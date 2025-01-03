@@ -9,8 +9,13 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
-from src.util.box_ops import box_xyxy_to_cxcywh
-from src.util.misc import interpolate
+# STIP is running as the main module.
+# from src.util.box_ops import box_xyxy_to_cxcywh
+# from src.util.misc import interpolate
+
+# STIP is running as a submodule.
+from STIP.src.util.box_ops import box_xyxy_to_cxcywh
+from STIP.src.util.misc import interpolate
 
 
 def crop(image, target, region):

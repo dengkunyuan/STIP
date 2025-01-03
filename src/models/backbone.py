@@ -11,7 +11,11 @@ from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
 from typing import Dict, List
 
-from src.util.misc import NestedTensor, is_main_process
+# STIP is running as the main module.
+# from src.util.misc import NestedTensor, is_main_process
+
+# STIP is running as a submodule.
+from STIP.src.util.misc import NestedTensor, is_main_process
 
 from .position_encoding import build_position_encoding
 

@@ -60,7 +60,8 @@ class HICOEvaluator():
 
         self.gts = []
         for img_gts in gts:
-            img_gts = {k: v.to('cpu').numpy() for k, v in img_gts.items() if k != 'id'}
+            # ACIL: ACIL的数据加载中构建了hoi_labels，它是一个list，而且eval过程中没有用到，所以这里不需要转换为numpy
+            img_gts = {k: v.to('cpu').numpy() for k, v in img_gts.items() if k not in ['id', 'hoi_labels']}
             self.gts.append({
                 'annotations': [{'bbox': bbox, 'category_id': hico_valid_obj_ids.index(label)} for bbox, label in zip(img_gts['boxes'], img_gts['labels'])], # map to valid obj ids
                 'hoi_annotation': [{'subject_id': hoi[0], 'object_id': hoi[1], 'category_id': hoi[2]} for hoi in img_gts['hois']]

@@ -2,9 +2,15 @@
 import torch.utils.data
 import torchvision
 
-from src.data.datasets.coco import build as build_coco
-from src.data.datasets.vcoco import build as build_vcoco
-from src.data.datasets.hico import build as build_hico
+# STIP is running as the main module.
+# from src.data.datasets.coco import build as build_coco
+# from src.data.datasets.vcoco import build as build_vcoco
+# from src.data.datasets.hico import build as build_hico
+
+# STIP is running as a submodule.
+from STIP.src.data.datasets.coco import build as build_coco
+from STIP.src.data.datasets.vcoco import build as build_vcoco
+from STIP.src.data.datasets.hico import build as build_hico
 
 def get_coco_api_from_dataset(dataset):
     for _ in range(10): # what is this for?

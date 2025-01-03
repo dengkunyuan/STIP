@@ -7,7 +7,11 @@ import copy
 import torch
 import torch.nn.functional as F
 from torch import nn
-from src.util import box_ops
+# STIP is running as the main module.
+# from src.util import box_ops
+
+# STIP is running as a submodule.
+from STIP.src.util import box_ops
 
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""

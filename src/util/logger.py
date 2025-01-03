@@ -12,7 +12,11 @@ import sys
 from time import sleep
 from collections import defaultdict
 
-from src.util.misc import SmoothedValue
+# STIP is running as the main module.
+# from src.util.misc import SmoothedValue
+
+# STIP is running as a submodule.
+from STIP.src.util.misc import SmoothedValue
 
 def print_params(model):
     n_parameters = sum(p.numel() for p in model.parameters())

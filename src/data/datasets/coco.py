@@ -10,7 +10,11 @@ import torch.utils.data
 import torchvision
 from pycocotools import mask as coco_mask
 
-import src.data.transforms.transforms as T
+# STIP is running as the main module.
+# import src.data.transforms.transforms as T
+
+# STIP is running as a submodule.
+import STIP.src.data.transforms.transforms as T
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks):

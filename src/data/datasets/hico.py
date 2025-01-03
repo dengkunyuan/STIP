@@ -16,8 +16,13 @@ import torch
 import torch.utils.data
 import torchvision
 
-from src.data.datasets import builtin_meta
-import src.data.transforms.transforms as T
+# STIP is running as the main module.
+# from src.data.datasets import builtin_meta
+# import src.data.transforms.transforms as T
+
+# STIP is running as a submodule.
+from STIP.src.data.datasets import builtin_meta
+import STIP.src.data.transforms.transforms as T
 
 class HICODetection(torch.utils.data.Dataset):
     def __init__(self, img_set, img_folder, anno_file, action_list_file, transforms, num_queries):
@@ -90,6 +95,7 @@ class HICODetection(torch.utils.data.Dataset):
         # guard against no boxes via resizing
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
 
+        # 由于STIP所用到的DETR目标检测器是91类，而不是80类。所以这里应该直接用category_id，而不是self._valid_obj_ids.index(obj['category_id'])
         if self.img_set == 'train':
             # Add index for confirming which boxes are kept after image transformation
             classes = [(i, obj['category_id']) for i, obj in enumerate(img_anno['annotations'])]
@@ -318,11 +324,17 @@ def build(image_set, args):
     root = Path(args.data_path)
     assert root.exists(), f'provided HOI path {root} does not exist'
     PATHS = {
-        'train': (root / 'images' / 'train2015', root / 'annotations' / 'trainval_hico.json'),
-        'val': (root / 'images' / 'test2015', root / 'annotations' / 'test_hico.json'),
-        'test': (root / 'images' / 'test2015', root / 'annotations' / 'test_hico.json')
+        'train': (root / 'images' / 'train2015', root / 'annotations' / 'shuffled_trainval_hico_first300.json'),
+        'val': (root / 'images' / 'test2015', root / 'annotations' / 'shuffled_test_hico_first300.json'),
+        'test': (root / 'images' / 'test2015', root / 'annotations' / 'shuffled_test_hico_first300.json')
     }
-    CORRECT_MAT_PATH = root / 'annotations' / 'corre_hico.npy'
+    # PATHS = {
+    #     'train': (root / 'images' / 'train2015', root / 'annotations' / 'trainval_hico.json'),
+    #     'val': (root / 'images' / 'test2015', root / 'annotations' / 'test_hico.json'),
+    #     'test': (root / 'images' / 'test2015', root / 'annotations' / 'test_hico.json')
+    # }
+    CORRECT_MAT_PATH = root / 'annotations' / 'corre_hico_shuffled_first300.npy'
+    # CORRECT_MAT_PATH = root / 'annotations' / 'corre_hico.npy'
     action_list_file = root / 'list_action.txt'
 
     img_folder, anno_file = PATHS[image_set]

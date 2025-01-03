@@ -12,8 +12,13 @@ import numpy as np
 
 from torch import nn
 
-from src.util import box_ops
-from src.util.misc import (accuracy, get_world_size, is_dist_avail_and_initialized)
+# STIP is running as the main module.
+# from src.util import box_ops
+# from src.util.misc import (accuracy, get_world_size, is_dist_avail_and_initialized)
+
+# STIP is running as a submodule.
+from STIP.src.util import box_ops
+from STIP.src.util.misc import (accuracy, get_world_size, is_dist_avail_and_initialized)
 
 class SetCriterion(nn.Module):
     """ This class computes the loss for DETR.

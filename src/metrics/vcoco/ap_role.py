@@ -1,6 +1,10 @@
 import numpy as np
 import torch
-from src.metrics.utils import _compute_ap, compute_overlap
+# STIP is running as the main module.
+# from src.metrics.utils import _compute_ap, compute_overlap
+
+# STIP is running as a submodule.
+from STIP.src.metrics.utils import _compute_ap, compute_overlap
 
 class APRole(object):
     def __init__(self, act_name, scenario_flag=True, iou_threshold=0.5):

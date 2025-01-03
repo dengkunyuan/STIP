@@ -1,14 +1,22 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from src.util.misc import NestedTensor, nested_tensor_from_tensor_list
+
+# STIP is running as the main module.
+# from src.util.misc import NestedTensor, nested_tensor_from_tensor_list
+# from src.util import box_ops
+# from src.util.misc import accuracy, is_dist_avail_and_initialized, get_world_size
+
+# STIP is running as a submodule.
+from STIP.src.util.misc import NestedTensor, nested_tensor_from_tensor_list
+from STIP.src.util import box_ops
+from STIP.src.util.misc import accuracy, is_dist_avail_and_initialized, get_world_size
+
 from torchvision.ops import roi_align
 from .transformer import TransformerDecoderLayer, TransformerDecoder
-from src.util import box_ops
 import numpy as np
 import matplotlib.pyplot as plt
-from src.util.misc import accuracy, is_dist_avail_and_initialized, get_world_size
-from src.models.stip_utils import check_annotation
+# from src.models.stip_utils import check_annotation
 import time
 
 class STIP(nn.Module):
@@ -116,6 +124,9 @@ class STIP(nn.Module):
                 #     # check_annotation(samples, targets, rel_num=20, idx=0)
 
         # >>>>>>>>>>>> HOI DETECTION LAYERS <<<<<<<<<<<<<<<
+        # ACIL: 初始化一个空列表，用于存储最终的verb representations
+        final_action_reps = []
+
         # 从特征图中提取关系特征，并根据配置选项从不同的层获取这些特征
         # 初始化三个空列表，用于存储预测的关系存在性、关系对和动作。
         pred_rel_exists, pred_rel_pairs, pred_actions = [], [], []
@@ -151,7 +162,8 @@ class STIP(nn.Module):
                 bg_instance_ids[suppress_ids] = True
 
             # 初始化一个关系矩阵 rel_mat，并根据一定的条件填充该矩阵，得到human-object pairs的关系矩阵
-            rel_mat = torch.zeros((num_nodes, num_nodes))
+            # ACIL: 将rel_mat从cpu转移到同一个device上
+            rel_mat = torch.zeros((num_nodes, num_nodes), device=outputs_class.device)
             # 将 human_instance_ids 对应的行和 ~bg_instance_ids 对应的列的元素设置为 1，表示这些关系对的主语是人类，宾语是非背景
             rel_mat[human_instance_ids, ~bg_instance_ids] = 1 # subj is human, obj is not background
             # 如果数据集不是 vcoco，将对角线元素设置为 0，避免主语和宾语是同一个对象。
@@ -278,6 +290,9 @@ class STIP(nn.Module):
             pred_actions.append(action_logits)
             pred_rel_exists.append(sampled_rel_pred_exists)
 
+            # ACIL: 保存一个batch中的verb representations，只保存最后一层的
+            final_action_reps.append(outs[-1])
+
         hoi_recognition_time = time.time() - start_time
         out = {
             "pred_logits": outputs_class[-1],
@@ -291,7 +306,9 @@ class STIP(nn.Module):
         if self.args.hoi_aux_loss: out['hoi_aux_outputs'] = self._set_hoi_aux_loss(pred_actions)
         if self.args.train_detr and self.args.aux_loss: out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
 
-        return out
+        # ACIL: 不仅返回预测结果out，还要返回最终的verb representations
+        # return out
+        return out, final_action_reps
 
     @torch.jit.unused
     def _set_hoi_aux_loss(self, pred_actions):
@@ -705,7 +722,8 @@ class STIPPostProcess(nn.Module):
                     'verb_scores': vs.to('cpu'),
                     'sub_ids': ids[:ids.shape[0] // 2],
                     'obj_ids': ids[ids.shape[0] // 2:],
-                    'hoi_recognition_time': outputs['hoi_recognition_time'],
+                    # ACIL: 处理过程中把hoi_recognition_time删掉了，所以这里也删掉
+                    # 'hoi_recognition_time': outputs['hoi_recognition_time'],
                     'orig_size': torch.tensor([img_h[batch_idx], img_w[batch_idx]])
                 }
                 results.append(res_dict)

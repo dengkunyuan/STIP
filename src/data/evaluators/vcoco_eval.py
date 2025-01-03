@@ -6,9 +6,15 @@ import os
 import numpy as np
 import torch
 
-from src.util.misc import all_gather
-from src.metrics.vcoco.ap_role import APRole
-from functools import partial
+# from src.util.misc import all_gather
+
+# STIP is running as the main module.
+# from src.metrics.vcoco.ap_role import APRole
+
+# STIP is running as a submodule.
+from STIP.src.metrics.vcoco.ap_role import APRole
+
+# from functools import partial
 
 def init_vcoco_evaluators(human_act_name, object_act_name):
     role_eval1 = APRole(act_name=object_act_name, scenario_flag=True, iou_threshold=0.5)

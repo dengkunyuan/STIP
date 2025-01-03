@@ -8,10 +8,17 @@ import itertools
 import matplotlib.pyplot as plt
 import torch
 
-import src.util.misc as utils
-import src.util.logger as loggers
-from src.data.evaluators.hico_eval import HICOEvaluator
-from src.models.stip_utils import check_annotation, plot_cross_attention, plot_hoi_results
+# STIP is running as the main module.
+# import src.util.misc as utils
+# import src.util.logger as loggers
+# from src.data.evaluators.hico_eval import HICOEvaluator
+# from src.models.stip_utils import check_annotation, plot_cross_attention, plot_hoi_results
+
+# STIP is running as a submodule.
+import STIP.src.util.misc as utils
+import STIP.src.util.logger as loggers
+from STIP.src.data.evaluators.hico_eval import HICOEvaluator
+from STIP.src.models.stip_utils import check_annotation, plot_cross_attention, plot_hoi_results
 
 @torch.no_grad()
 def hico_evaluate(model, postprocessors, data_loader, device, thr, args):

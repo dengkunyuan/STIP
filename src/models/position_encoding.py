@@ -6,7 +6,11 @@ import math
 import torch
 from torch import nn
 
-from src.util.misc import NestedTensor
+# STIP is running as the main module.
+# from src.util.misc import NestedTensor
+
+# STIP is running as a submodule.
+from STIP.src.util.misc import NestedTensor
 
 
 class PositionEmbeddingSine(nn.Module):

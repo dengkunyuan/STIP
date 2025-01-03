@@ -97,6 +97,9 @@ def main(args):
         model_without_ddp = model.module
     n_parameters = print_params(model)
 
+    # 所有不属于detr的参数都是可训练的，这些参数的学习率是args.lr
+    # 属于detr但不属于backbone的参数的学习率是args.lr * 0.1
+    # 属于detr且属于backbone的参数的学习率是args.lr * 0.01
     param_dicts = [
         {"params": [p for n, p in model_without_ddp.named_parameters() if "detr" not in n and p.requires_grad]},
         {
@@ -244,40 +247,6 @@ if __name__ == '__main__':
         'End-to-End Human Object Interaction training and evaluation script',
         parents=[get_args_parser()]
     )
-    # training
-    parser.add_argument('--detr_weights', default=None, type=str)
-    parser.add_argument('--train_detr', action='store_true', default=False)
-    parser.add_argument('--finetune_detr_weight', default=0.1, type=float)
-    parser.add_argument('--lr_detr', default=1e-5, type=float)
-    parser.add_argument('--reduce_lr_on_plateau_patience', default=2, type=int)
-    parser.add_argument('--reduce_lr_on_plateau_factor', default=0.1, type=float)
-
-    # loss
-    parser.add_argument('--proposal_focal_loss_alpha', default=0.75, type=float) # large alpha for high recall
-    parser.add_argument('--action_focal_loss_alpha', default=0.5, type=float)
-    parser.add_argument('--proposal_focal_loss_gamma', default=2, type=float)
-    parser.add_argument('--action_focal_loss_gamma', default=2, type=float)
-    parser.add_argument('--proposal_loss_coef', default=1, type=float)
-    parser.add_argument('--action_loss_coef', default=1, type=float)
-
-    # ablations
-    parser.add_argument('--no_hard_mining_for_relation_discovery', dest='use_hard_mining_for_relation_discovery', action='store_false', default=True)
-    parser.add_argument('--no_relation_dependency_encoding', dest='use_relation_dependency_encoding', action='store_false', default=True)
-    parser.add_argument('--no_memory_layout_encoding', dest='use_memory_layout_encoding', action='store_false', default=True, help='layout encodings')
-    parser.add_argument('--no_nms_on_detr', dest='apply_nms_on_detr', action='store_false', default=True)
-    parser.add_argument('--no_tail_semantic_feature', dest='use_tail_semantic_feature', action='store_false', default=True)
-    parser.add_argument('--no_spatial_feature', dest='use_spatial_feature', action='store_false', default=True)
-    parser.add_argument('--no_interaction_decoder', action='store_true', default=False)
-
-    # not sensitive or effective
-    parser.add_argument('--use_memory_union_mask', action='store_true', default=False)
-    parser.add_argument('--use_union_feature', action='store_true', default=False)
-    parser.add_argument('--adaptive_relation_query_num', action='store_true', default=False)
-    parser.add_argument('--use_relation_tgt_mask', action='store_true', default=False)
-    parser.add_argument('--use_relation_tgt_mask_attend_topk', default=10, type=int)
-    parser.add_argument('--use_prior_verb_label_mask', action='store_true', default=False)
-    parser.add_argument('--relation_feature_map_from', default='backbone', help='backbone | detr_encoder')
-    parser.add_argument('--use_query_fourier_encoding', action='store_true', default=False)
 
     args = parser.parse_args()
     args.STIP_relation_head = True

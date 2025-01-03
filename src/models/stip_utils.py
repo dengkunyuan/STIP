@@ -3,14 +3,22 @@ import warnings
 from torch.nn.functional import linear, pad, softmax, dropout # containing original multi_head_attention_forward implementation
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.nn.modules.activation import Parameter # containing original MultiheadAttention implementation
-from torch.nn.modules.linear import _LinearWithBias
+
+# ACIL: 优化代码，避免pytorch版本影响
+# from torch.nn.modules.linear import _LinearWithBias
+from torch.nn import Linear
+
 import torch.nn.functional as F
 import numpy as np
 # visualize results
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.patheffects as PathEffects
-from src.util import box_ops
+# STIP is running as the main module.
+# from src.util import box_ops
+
+# STIP is running as a submodule.
+from STIP.src.util import box_ops
 
 
 Tensor = torch.Tensor
@@ -370,7 +378,9 @@ class MultiheadAttention(torch.nn.Module):
             self.in_proj_bias = Parameter(torch.empty(3 * embed_dim))
         else:
             self.register_parameter('in_proj_bias', None)
-        self.out_proj = _LinearWithBias(embed_dim, embed_dim)
+        # ACIL: 优化代码，避免pytorch版本影响
+        # self.out_proj = _LinearWithBias(embed_dim, embed_dim)
+        self.out_proj = Linear(embed_dim, embed_dim)
 
         if add_bias_kv:
             self.bias_k = Parameter(torch.empty(1, 1, embed_dim))

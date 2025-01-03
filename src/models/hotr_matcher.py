@@ -6,9 +6,14 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torch import nn
 
-from src.util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou
+# STIP is running as the main module.
+# from src.util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou
+# import src.util.misc as utils
 
-import src.util.misc as utils
+# STIP is running as a submodule.
+from STIP.src.util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou
+from STIP.src.util import misc as utils
+
 import wandb
 
 class HungarianPairMatcher(nn.Module):

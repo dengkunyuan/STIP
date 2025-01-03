@@ -10,11 +10,19 @@ import torch
 import time
 import datetime
 
-import src.util.misc as utils
-import src.util.logger as loggers
-from src.data.evaluators.vcoco_eval import VCocoEvaluator
-from src.util.box_ops import rescale_bboxes, rescale_pairs
-from src.models.stip_utils import check_annotation, plot_cross_attention
+# STIP is running as the main module.
+# import src.util.misc as utils
+# import src.util.logger as loggers
+# from src.data.evaluators.vcoco_eval import VCocoEvaluator
+# from src.util.box_ops import rescale_bboxes, rescale_pairs
+# from src.models.stip_utils import check_annotation, plot_cross_attention
+
+# STIP is running as a submodule.
+import STIP.src.util.misc as utils
+import STIP.src.util.logger as loggers
+from STIP.src.data.evaluators.vcoco_eval import VCocoEvaluator
+from STIP.src.util.box_ops import rescale_bboxes, rescale_pairs
+from STIP.src.models.stip_utils import check_annotation, plot_cross_attention
 
 import wandb
 

@@ -107,6 +107,11 @@ class STIP(nn.Module):
         if self.training:
             detr_outs = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
             det2gt_indices = self.detr_matcher(detr_outs, targets)
+            # ACIL: 使det2gt_indices的device与pred_logits的device一致
+            det2gt_indices = [
+                (d[0].to(device=detr_outs["pred_logits"].device), d[1].to(device=detr_outs["pred_logits"].device)) for d
+                in det2gt_indices]
+
             gt_rel_pairs = []
             # 遍历 det2gt_indices 和 targets，为每个目标生成一个映射 gt2det_map，将目标索引映射到检测索引，并生成关系对 gt_rels。
             for (ds, gs), t in zip(det2gt_indices, targets):

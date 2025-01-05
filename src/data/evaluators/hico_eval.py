@@ -156,10 +156,11 @@ class HICOEvaluator():
         m_r_rare = np.mean(list(rare_recall.values())) * 100
         m_r_non_rare = np.mean(list(non_rare_recall.values())) * 100
 
-        print('--------------------')
-        print('mAP: {} mAP rare: {}  mAP non-rare: {}'.format(m_ap, m_ap_rare, m_ap_non_rare))
-        print('mR: {} mR rare: {}  mR non-rare: {}'.format(m_max_recall, m_r_rare, m_r_non_rare))
-        print('--------------------')
+        # ACIL: 删除多余的print
+        # print('--------------------')
+        # print('mAP: {} mAP rare: {}  mAP non-rare: {}'.format(m_ap, m_ap_rare, m_ap_non_rare))
+        # print('mR: {} mR rare: {}  mR non-rare: {}'.format(m_max_recall, m_r_rare, m_r_non_rare))
+        # print('--------------------')
 
         return {'mAP': m_ap, 'mAP rare': m_ap_rare, 'mAP non-rare': m_ap_non_rare, 'mean max recall': m_max_recall}
 

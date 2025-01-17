@@ -7,6 +7,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 # ------------------------------------------------------------------------
 import argparse
+# ACIL: 避免特定于ACIL的命令行参数影响STIP的参数解析，因此直接给出STIP的参数
+from argparse import Namespace
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
@@ -183,3 +185,114 @@ def get_args_parser():
     parser.add_argument('--use_query_fourier_encoding', action='store_true', default=False)
 
     return parser
+
+
+# ACIL: 避免特定于ACIL的命令行参数影响STIP的参数解析，因此直接给出STIP的参数
+def get_args():
+    args_dict = {
+        'lr': 1e-4,
+        'lr_backbone': 1e-5,
+        'batch_size': 2,
+        'weight_decay': 1e-4,
+        'epochs': 100,
+        'lr_drop': 80,
+        'clip_max_norm': 0.1,
+        'frozen_weights': None,
+        'backbone': 'resnet50',
+        'dilation': False,
+        'position_embedding': 'sine',
+        'enc_layers': 6,
+        'dec_layers': 6,
+        'dim_feedforward': 2048,
+        'hidden_dim': 256,
+        'dropout': 0.1,
+        'nheads': 8,
+        'num_queries': 100,
+        'pre_norm': False,
+        'masks': False,
+        'no_aux_loss': True,
+        'aux_loss': True,
+        'mask_loss_coef': 1,
+        'dice_loss_coef': 1,
+        'bbox_loss_coef': 5,
+        'giou_loss_coef': 2,
+        'eos_coef': 0.1,
+        'set_cost_class': 1,
+        'set_cost_bbox': 5,
+        'set_cost_giou': 2,
+        'HOIDet': False,
+        'share_enc': False,
+        'pretrained_dec': False,
+        'hoi_enc_layers': 1,
+        'hoi_dec_layers': 6,
+        'hoi_nheads': 8,
+        'hoi_dim_feedforward': 2048,
+        'num_hoi_queries': 32,
+        'hoi_aux_loss': False,
+        'set_cost_idx': 1,
+        'set_cost_act': 1,
+        'set_cost_tgt': 1,
+        'temperature': 0.05,
+        'hoi_idx_loss_coef': 1,
+        'hoi_act_loss_coef': 1,
+        'hoi_tgt_loss_coef': 1,
+        'hoi_eos_coef': 0.1,
+        'dataset_file': None,
+        'data_path': None,
+        'object_threshold': 0,
+        'output_dir': '',
+        'custom_path': '',
+        'device': 'cuda',
+        'seed': 42,
+        'resume': '',
+        'start_epoch': 0,
+        'num_workers': 4,
+        'eval': False,
+        'validate': False,
+        'world_size': 1,
+        'dist_url': 'env://',
+        'wandb': False,
+        'project_name': 'HOTR',
+        'group_name': 'KakaoBrain',
+        'run_name': 'run_000001',
+        'STIP_relation_head': False,
+        'finetune_detr': False,
+        'use_high_resolution_relation_feature_map': False,
+        'detr_weights': None,
+        'train_detr': False,
+        'finetune_detr_weight': 0.1,
+        'lr_detr': 1e-5,
+        'reduce_lr_on_plateau_patience': 2,
+        'reduce_lr_on_plateau_factor': 0.1,
+        'proposal_focal_loss_alpha': 0.75,
+        'action_focal_loss_alpha': 0.5,
+        'proposal_focal_loss_gamma': 2,
+        'action_focal_loss_gamma': 2,
+        'proposal_loss_coef': 1,
+        'action_loss_coef': 1,
+        'no_hard_mining_for_relation_discovery': True,
+        'use_hard_mining_for_relation_discovery': True,
+        'no_relation_dependency_encoding': True,
+        'use_relation_dependency_encoding': True,
+        'no_memory_layout_encoding': True,
+        'use_memory_layout_encoding': True,
+        'no_nms_on_detr': True,
+        'apply_nms_on_detr': True,
+        'no_tail_semantic_feature': True,
+        'use_tail_semantic_feature': True,
+        'no_spatial_feature': True,
+        'use_spatial_feature': True,
+        'no_interaction_decoder': False,
+        'use_memory_union_mask': False,
+        'use_union_feature': False,
+        'adaptive_relation_query_num': False,
+        'use_relation_tgt_mask': False,
+        'use_relation_tgt_mask_attend_topk': 10,
+        'use_prior_verb_label_mask': False,
+        'relation_feature_map_from': 'backbone',
+        'use_query_fourier_encoding': False
+    }
+    # 转换为Namespace类型
+    args = Namespace(**args_dict)
+
+    return args
